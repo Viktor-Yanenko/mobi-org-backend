@@ -7,6 +7,7 @@ import { notFoundHandler } from './middlewares/notFoundHandler.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import cookieParser from 'cookie-parser';
 import authRouter from './routers/auth.js';
+import cartRouter from './routers/cart.js';
 
 const PORT = Number(getEnvVar('PORT', 5000));
 const FRONTEND_URL = getEnvVar('FRONTEND_URL', 'http://localhost:3000');
@@ -34,6 +35,7 @@ export const startServer = () => {
 
   app.use('/auth', authRouter);
   app.use('/products', productsRouter);
+  app.use('/cart', cartRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
