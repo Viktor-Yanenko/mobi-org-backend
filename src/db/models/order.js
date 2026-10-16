@@ -1,12 +1,14 @@
 import { model, Schema } from 'mongoose';
 
+const { ObjectId } = Schema.Types;
+
 const ordersSchema = new Schema({
   orderNumber: { type: Number, required: true, unique: true },
-  user: { type: ObjectId, ref: 'User' }, // null для гостьового замовлення
+  user: { type: ObjectId, ref: 'users' }, // null для гостьового замовлення
   items: [
     {
       // знімок на момент покупки
-      product: { type: ObjectId, ref: 'Product' },
+      product: { type: ObjectId, ref: 'products' },
       sku: String,
       name: String,
       image: String,

@@ -1,13 +1,15 @@
 import { model, Schema } from 'mongoose';
 
+const { ObjectId } = Schema.Types;
+
 const productsSchema = new Schema(
   {
     type: { type: String, enum: ['phone', 'accessory'], required: true }, // discriminatorKey
     name: { type: String, required: true, trim: true }, // 'iPhone 16 Pro'
     slug: { type: String, required: true, unique: true },
     description: String,
-    brand: { type: ObjectId, ref: 'Brand', required: true },
-    category: { type: ObjectId, ref: 'Category', required: true },
+    brand: { type: ObjectId, ref: 'brands', required: true },
+    category: { type: ObjectId, ref: 'categories', required: true },
     images: [String], // URL (Cloudinary)
     variants: [
       {
@@ -28,8 +30,39 @@ const productsSchema = new Schema(
     },
     isActive: { type: Boolean, default: true },
   },
-  { timestamps: true },
-  { discriminatorKey: 'type' },
+  { timestamps: true, discriminatorKey: 'type' },
 );
 
 export const ProductsCollection = model('products', productsSchema);
+
+export const PhonesCollection = ProductsCollection.discriminator(
+  'phone',
+  new Schema({
+    specs: {
+      os: String,
+      screenSize: Number,
+      ram: Number,
+      battery: Number,
+    },
+  }),
+);
+
+export const AccessoriesCollection = ProductsCollection.discriminator(
+  'accessory',
+  new Schema({
+    accessoryType: {
+      type: String,
+      enum: [
+        'case',
+        'charger',
+        'cable',
+        'headphones',
+        'screen-protector',
+        'powerbank',
+        'other',
+      ],
+      required: true,
+    },
+    compatibleWith: [{ type: Schema.Types.ObjectId, ref: 'products' }],
+  }),
+);

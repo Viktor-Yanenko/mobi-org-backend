@@ -1,5 +1,7 @@
 import { model, Schema } from 'mongoose';
 
+const { ObjectId } = Schema.Types;
+
 const usersSchema = new Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -21,7 +23,7 @@ const usersSchema = new Schema(
         isDefault: Boolean,
       },
     ],
-    favorites: [{ type: ObjectId, ref: 'Product' }],
+    favorites: [{ type: ObjectId, ref: 'products' }],
   },
   { timestamps: true, versionKey: false },
 );
