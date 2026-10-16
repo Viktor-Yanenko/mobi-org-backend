@@ -8,6 +8,7 @@ const reviewsSchema = new Schema(
     user: { type: ObjectId, ref: 'users', required: true },
     rating: { type: Number, min: 1, max: 5, required: true },
     text: String,
+    isVerifiedPurchase: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

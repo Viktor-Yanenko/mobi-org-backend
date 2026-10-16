@@ -33,6 +33,12 @@ const productsSchema = new Schema(
   { timestamps: true, discriminatorKey: 'type' },
 );
 
+productsSchema.pre('save', function () {
+  this.minPrice = this.variants.length
+    ? Math.min(...this.variants.map((variant) => variant.price))
+    : undefined;
+});
+
 export const ProductsCollection = model('products', productsSchema);
 
 export const PhonesCollection = ProductsCollection.discriminator(
