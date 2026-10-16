@@ -1,0 +1,38 @@
+{
+  "name": "mobi-org-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint src/**/*.js",
+    "start": "node ./src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Viktor-Yanenko/mobi-org-backend.git"
+  },
+  "keywords": [],
+  "author": "Eugene Lesnyak, Viktor Yanenko",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/Viktor-Yanenko/mobi-org-backend/issues"
+  },
+  "homepage": "https://github.com/Viktor-Yanenko/mobi-org-backend#readme",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "nodemon": "^3.1.14",
+    "pino-pretty": "^13.2.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "mongoose": "^9.11.2",
+    "pino-http": "^11.0.0"
+  }
+}
