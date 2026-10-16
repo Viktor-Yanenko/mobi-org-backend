@@ -1,0 +1,1313 @@
+openapi: 3.0.3
+info:
+  title: MobiOrg API
+  version: 1.0.0
+  description: |
+    REST API інтернет-магазину мобільних телефонів та аксесуарів MobiOrg.
+
+    **Авторизація.** Після `POST /auth/login` скопіюйте `accessToken` з відповіді,
+    натисніть кнопку **Authorize** і вставте його. Токен живе 15 хвилин, після цього
+    викличте `POST /auth/refresh` (він бере `sessionId` і `refreshToken` з cookies).
+
+    Усі відповіді мають вигляд `{ status, message, data }`.
+security: []
+servers:
+  - url: /
+    description: Той самий сервер, з якого відкрито документацію
+tags:
+  - name: Auth
+    description: Реєстрація, вхід, сесії
+  - name: Catalog
+    description: Каталог товарів, бренди, категорії
+  - name: Admin products
+    description: Керування товарами (тільки адмін)
+  - name: Reviews
+    description: Відгуки й рейтинг
+  - name: Cart
+    description: Кошик (тільки для залогінених)
+  - name: Orders
+    description: Замовлення
+  - name: Favorites
+    description: Обране
+  - name: Users
+    description: Профіль користувача
+
+paths:
+  # ───────────── Auth ─────────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Реєстрація
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 50, example: Viktor }
+                email: { type: string, format: email, example: viktor@test.com }
+                password: { type: string, minLength: 8, maxLength: 64, example: secret123 }
+                phone: { type: string, pattern: '^\+?\d{10,13}$', example: '+380501234567' }
+      responses:
+        '201':
+          description: Користувача створено
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Вхід
+      description: Створює сесію. `accessToken` повертається в тілі, `sessionId` і `refreshToken` ставляться в httpOnly cookies.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: viktor@test.com }
+                password: { type: string, example: secret123 }
+      responses:
+        '200': { $ref: '#/components/responses/AccessToken' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Оновити сесію
+      description: Видає нову пару токенів за cookies `sessionId` і `refreshToken`. Стара сесія видаляється.
+      security:
+        - cookieAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AccessToken' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Вихід
+      security:
+        - cookieAuth: []
+      responses:
+        '204': { description: 'Сесію видалено, cookies очищено' }
+
+  /auth/current:
+    get:
+      tags: [Auth]
+      summary: Поточний користувач
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Поточний користувач
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ───────────── Catalog ─────────────
+  /products:
+    get:
+      tags: [Catalog]
+      summary: Список товарів
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: perPage, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 12 } }
+        - { name: type, in: query, schema: { type: string, enum: [phone, accessory] } }
+        - { name: brand, in: query, description: Slug бренду, schema: { type: string, example: apple } }
+        - { name: category, in: query, description: Slug категорії, schema: { type: string, example: smartphones } }
+        - { name: minPrice, in: query, description: 'Мінімальна ціна, грн', schema: { type: number } }
+        - { name: maxPrice, in: query, description: 'Максимальна ціна, грн', schema: { type: number } }
+        - { name: search, in: query, description: Частина назви, schema: { type: string } }
+        - { name: sortBy, in: query, schema: { type: string, enum: [price, createdAt, rating, name], default: createdAt } }
+        - { name: sortOrder, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
+      responses:
+        '200':
+          description: Сторінка товарів
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/Pagination'
+                          - type: object
+                            properties:
+                              data:
+                                type: array
+                                items: { $ref: '#/components/schemas/Product' }
+                              hasNextPage: { type: boolean }
+                              hasPreviousPage: { type: boolean }
+    post:
+      tags: [Admin products]
+      summary: Створити товар
+      description: Тип (`phone` або `accessory`) задається при створенні й більше не змінюється. Від нього залежать дозволені поля.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/PhoneInput'
+                - $ref: '#/components/schemas/AccessoryInput'
+              discriminator:
+                propertyName: type
+                mapping:
+                  phone: '#/components/schemas/PhoneInput'
+                  accessory: '#/components/schemas/AccessoryInput'
+      responses:
+        '201':
+          description: Товар створено
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /products/{slugOrId}:
+    get:
+      tags: [Catalog]
+      summary: Товар за slug
+      description: Для телефону додатково повертає масив `accessories` із сумісними аксесуарами.
+      parameters:
+        - name: slugOrId
+          in: path
+          required: true
+          description: Для GET це slug товару
+          schema: { type: string, example: iphone-16 }
+      responses:
+        '200':
+          description: Товар
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    patch:
+      tags: [Admin products]
+      summary: Редагувати товар
+      description: Усі поля необов'язкові. Масив `variants` замінюється повністю. `minPrice` перераховується автоматично.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/slugOrIdAsId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductUpdate' }
+      responses:
+        '200':
+          description: Товар оновлено
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Admin products]
+      summary: Прибрати товар з каталогу
+      description: 'М''яке видалення, ставить `isActive = false`. Повернути можна через PATCH з `{ "isActive": true }`.'
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/slugOrIdAsId'
+      responses:
+        '204': { description: Товар приховано }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /products/{productId}/images:
+    post:
+      tags: [Admin products]
+      summary: Завантажити фото
+      description: До 5 файлів JPG, PNG або WEBP, кожен до 5 МБ.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/productId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [images]
+              properties:
+                images:
+                  type: array
+                  maxItems: 5
+                  items: { type: string, format: binary }
+      responses:
+        '200':
+          description: Фото додано, у `images` нові URL
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Admin products]
+      summary: Видалити фото
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/productId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, format: uri, example: 'http://localhost:5000/uploads/products/0f8e2c1a.jpg' }
+      responses:
+        '200':
+          description: Фото видалено
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /brands:
+    get:
+      tags: [Catalog]
+      summary: Список брендів
+      responses:
+        '200':
+          description: Бренди за алфавітом
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Brand' }
+
+  /categories:
+    get:
+      tags: [Catalog]
+      summary: Список категорій
+      responses:
+        '200':
+          description: Категорії
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Category' }
+
+  # ───────────── Reviews ─────────────
+  /products/{productId}/reviews:
+    get:
+      tags: [Reviews]
+      summary: Відгуки товару
+      parameters:
+        - $ref: '#/components/parameters/productId'
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: perPage, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+      responses:
+        '200':
+          description: Сторінка відгуків, нові зверху
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/Pagination'
+                          - type: object
+                            properties:
+                              data:
+                                type: array
+                                items: { $ref: '#/components/schemas/Review' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Reviews]
+      summary: Залишити відгук
+      description: Один відгук на товар від користувача. Рейтинг товару перераховується автоматично.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/productId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rating]
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5, example: 5 }
+                text: { type: string, maxLength: 2000, example: Чудовий телефон }
+      responses:
+        '201':
+          description: Відгук створено
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /reviews/{reviewId}:
+    patch:
+      tags: [Reviews]
+      summary: Змінити свій відгук
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/reviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                rating: { type: integer, minimum: 1, maximum: 5 }
+                text: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: Відгук оновлено
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Reviews]
+      summary: Видалити відгук
+      description: Автор може видалити свій відгук, адмін будь-який.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/reviewId'
+      responses:
+        '204': { description: Відгук видалено }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ───────────── Cart ─────────────
+  /cart:
+    get:
+      tags: [Cart]
+      summary: Мій кошик
+      description: Ціни й залишки завжди актуальні, бо беруться з товарів.
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Cart]
+      summary: Очистити кошик
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /cart/items:
+    post:
+      tags: [Cart]
+      summary: Додати товар
+      description: Якщо такий SKU вже є в кошику, кількість додається.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, sku]
+              properties:
+                productId: { $ref: '#/components/schemas/ObjectId' }
+                sku: { type: string, example: IP16-128-BLK }
+                quantity: { type: integer, minimum: 1, maximum: 10, default: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /cart/items/{sku}:
+    parameters:
+      - { name: sku, in: path, required: true, schema: { type: string, example: IP16-128-BLK } }
+    patch:
+      tags: [Cart]
+      summary: Змінити кількість
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity: { type: integer, minimum: 1, maximum: 10, example: 2 }
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Cart]
+      summary: Прибрати позицію
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /cart/merge:
+    post:
+      tags: [Cart]
+      summary: Перенести гостьовий кошик
+      description: Викликається одразу після входу з кошиком з localStorage. Недоступні товари пропускаються, кількість обрізається до залишку.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: object
+                    required: [productId, sku]
+                    properties:
+                      productId: { $ref: '#/components/schemas/ObjectId' }
+                      sku: { type: string }
+                      quantity: { type: integer, minimum: 1, maximum: 10, default: 1 }
+      responses:
+        '200': { $ref: '#/components/responses/Cart' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ───────────── Orders ─────────────
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Оформити замовлення з кошика
+      description: |
+        Списує залишки, рахує доставку (Нова пошта 80 грн, кур'єр 150 грн, самовивіз 0, від 5000 грн безкоштовно)
+        і очищає кошик. Для самовивозу `city` і `address` не потрібні.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OrderInput' }
+      responses:
+        '201':
+          description: Замовлення створено
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      tags: [Orders]
+      summary: Мої замовлення
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Замовлення, нові зверху
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /orders/all:
+    get:
+      tags: [Orders]
+      summary: Усі замовлення (адмін)
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/OrderStatus' } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: perPage, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+      responses:
+        '200':
+          description: Сторінка замовлень
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/Pagination'
+                          - type: object
+                            properties:
+                              data:
+                                type: array
+                                items: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /orders/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Одне замовлення
+      description: Власник бачить своє замовлення, адмін будь-яке.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/orderId'
+      responses:
+        '200':
+          description: Замовлення
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /orders/{orderId}/cancel:
+    post:
+      tags: [Orders]
+      summary: Скасувати замовлення
+      description: Тільки зі статусом `new`. Товари повертаються на склад.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/orderId'
+      responses:
+        '200':
+          description: Замовлення скасовано
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /orders/{orderId}/status:
+    patch:
+      tags: [Orders]
+      summary: Змінити статус (адмін)
+      description: Скасоване замовлення змінити не можна. Перехід у `cancelled` повертає товари на склад.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/orderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/OrderStatus' }
+      responses:
+        '200':
+          description: Статус змінено
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ───────────── Favorites ─────────────
+  /favorites:
+    get:
+      tags: [Favorites]
+      summary: Моє обране
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/Favorites' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /favorites/{productId}:
+    parameters:
+      - $ref: '#/components/parameters/productId'
+    post:
+      tags: [Favorites]
+      summary: Додати в обране
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/Favorites' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Favorites]
+      summary: Прибрати з обраного
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/Favorites' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ───────────── Users ─────────────
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Мій профіль
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Профіль
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Users]
+      summary: Змінити ім'я або телефон
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 2, maxLength: 50, example: Віктор Яненко }
+                phone: { type: string, example: '+380501234567' }
+      responses:
+        '200':
+          description: Профіль оновлено
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users/me/password:
+    patch:
+      tags: [Users]
+      summary: Змінити пароль
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string, example: secret123 }
+                newPassword: { type: string, minLength: 8, maxLength: 64, example: newsecret1 }
+      responses:
+        '204': { description: Пароль змінено }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /users/me/addresses:
+    post:
+      tags: [Users]
+      summary: Додати адресу
+      description: Максимум 5 адрес. Перша адреса автоматично стає основною.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/AddressInput'
+                - type: object
+                  required: [city]
+      responses:
+        '201': { $ref: '#/components/responses/Addresses' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /users/me/addresses/{addressId}:
+    parameters:
+      - { name: addressId, in: path, required: true, schema: { $ref: '#/components/schemas/ObjectId' } }
+    patch:
+      tags: [Users]
+      summary: Змінити адресу
+      description: '`isDefault: true` робить адресу основною, решта автоматично стають не основними.'
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/AddressInput'
+                - type: object
+                  minProperties: 1
+      responses:
+        '200': { $ref: '#/components/responses/Addresses' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Users]
+      summary: Видалити адресу
+      description: Якщо видалити основну, основною стає перша з решти.
+      security:
+        - bearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/Addresses' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: '`accessToken` з відповіді `POST /auth/login` або `POST /auth/refresh`'
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: refreshToken
+      description: Браузер надсилає cookies `sessionId` і `refreshToken` автоматично
+
+  parameters:
+    slugOrIdAsId:
+      name: slugOrId
+      in: path
+      required: true
+      description: Для PATCH і DELETE це _id товару
+      schema: { $ref: '#/components/schemas/ObjectId' }
+    productId:
+      name: productId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ObjectId' }
+    reviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ObjectId' }
+    orderId:
+      name: orderId
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/ObjectId' }
+
+  responses:
+    ValidationError:
+      description: Неправильні дані запиту
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            status: 400
+            message: Bad Request
+            errors: ['"email" must be a valid email']
+    Unauthorized:
+      description: Потрібен вхід або токен прострочений
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { status: 401, message: Access token expired }
+    Forbidden:
+      description: Тільки для адміна
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { status: 403, message: Admin access required }
+    NotFound:
+      description: Не знайдено
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { status: 404, message: Product not found }
+    Conflict:
+      description: Конфлікт (дублікат, нестача на складі, недопустимий стан)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { status: 409, message: Only 3 items in stock }
+    AccessToken:
+      description: Сесію створено, cookies `sessionId` і `refreshToken` встановлено
+      headers:
+        Set-Cookie:
+          schema: { type: string }
+          description: 'sessionId=...; HttpOnly, refreshToken=...; HttpOnly'
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      accessToken: { type: string }
+    Cart:
+      description: Кошик
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Cart' }
+    Favorites:
+      description: Обрані товари
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductShort' }
+    Addresses:
+      description: Усі адреси користувача
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Envelope'
+              - type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Address' }
+
+  schemas:
+    ObjectId:
+      type: string
+      pattern: '^[0-9a-fA-F]{24}$'
+      example: 671f3a2b9c4e5d6f7a8b9c0d
+
+    Envelope:
+      type: object
+      properties:
+        status: { type: integer, example: 200 }
+        message: { type: string, example: Success }
+
+    Error:
+      type: object
+      properties:
+        status: { type: integer }
+        message: { type: string }
+        errors:
+          type: array
+          items: { type: string }
+
+    Pagination:
+      type: object
+      properties:
+        page: { type: integer, example: 1 }
+        perPage: { type: integer, example: 12 }
+        totalItems: { type: integer, example: 7 }
+        totalPages: { type: integer, example: 1 }
+
+    Brand:
+      type: object
+      properties:
+        _id: { $ref: '#/components/schemas/ObjectId' }
+        name: { type: string, example: Apple }
+        slug: { type: string, example: apple }
+        logo: { type: string }
+
+    Category:
+      type: object
+      properties:
+        _id: { $ref: '#/components/schemas/ObjectId' }
+        name: { type: string, example: Смартфони }
+        slug: { type: string, example: smartphones }
+        type: { type: string, enum: [phone, accessory] }
+        parent: { type: string, nullable: true, pattern: '^[0-9a-fA-F]{24}$', description: ObjectId батьківської категорії }
+        image: { type: string }
+
+    Variant:
+      type: object
+      required: [sku, price]
+      properties:
+        sku: { type: string, example: IP16-128-BLK }
+        color: { type: string, example: Black }
+        storage: { type: integer, description: ГБ, example: 128 }
+        price: { type: integer, description: грн, example: 39999 }
+        oldPrice: { type: integer, description: Стара ціна для знижки, example: 42999 }
+        stock: { type: integer, example: 10 }
+        images:
+          type: array
+          items: { type: string }
+
+    PhoneSpecs:
+      type: object
+      properties:
+        os: { type: string, example: iOS 18 }
+        screenSize: { type: number, example: 6.1 }
+        ram: { type: integer, example: 8 }
+        battery: { type: integer, example: 3561 }
+
+    AccessoryType:
+      type: string
+      enum: [case, charger, cable, headphones, screen-protector, powerbank, other]
+
+    Product:
+      type: object
+      description: Телефон (`type = phone`, є `specs`) або аксесуар (`type = accessory`, є `accessoryType` і `compatibleWith`)
+      properties:
+        _id: { $ref: '#/components/schemas/ObjectId' }
+        type: { type: string, enum: [phone, accessory] }
+        name: { type: string, example: iPhone 16 }
+        slug: { type: string, example: iphone-16 }
+        description: { type: string }
+        brand: { $ref: '#/components/schemas/Brand' }
+        category: { $ref: '#/components/schemas/Category' }
+        images:
+          type: array
+          items: { type: string }
+        variants:
+          type: array
+          items: { $ref: '#/components/schemas/Variant' }
+        minPrice: { type: integer, example: 39999 }
+        rating:
+          type: object
+          properties:
+            average: { type: number, example: 4.5 }
+            count: { type: integer, example: 12 }
+        isActive: { type: boolean }
+        specs: { $ref: '#/components/schemas/PhoneSpecs' }
+        accessoryType: { $ref: '#/components/schemas/AccessoryType' }
+        compatibleWith:
+          type: array
+          items: { $ref: '#/components/schemas/ObjectId' }
+        accessories:
+          type: array
+          description: 'Тільки в `GET /products/{slug}` для телефону'
+          items: { $ref: '#/components/schemas/ProductShort' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ProductShort:
+      type: object
+      properties:
+        _id: { $ref: '#/components/schemas/ObjectId' }
+        type: { type: string, enum: [phone, accessory] }
+        name: { type: string }
+        slug: { type: string }
+        images:
+          type: array
+          items: { type: string }
+        minPrice: { type: integer }
+
+    ProductResponse:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/Product' }
+
+    ProductBaseInput:
+      type: object
+      required: [type, name, slug, brand, category, variants]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 120, example: Google Pixel 9 }
+        slug: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', example: google-pixel-9 }
+        description: { type: string, maxLength: 5000 }
+        brand: { $ref: '#/components/schemas/ObjectId' }
+        category: { $ref: '#/components/schemas/ObjectId' }
+        images:
+          type: array
+          items: { type: string }
+        variants:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/Variant' }
+        isActive: { type: boolean }
+
+    PhoneInput:
+      allOf:
+        - $ref: '#/components/schemas/ProductBaseInput'
+        - type: object
+          properties:
+            type: { type: string, enum: [phone] }
+            specs: { $ref: '#/components/schemas/PhoneSpecs' }
+
+    AccessoryInput:
+      allOf:
+        - $ref: '#/components/schemas/ProductBaseInput'
+        - type: object
+          required: [accessoryType]
+          properties:
+            type: { type: string, enum: [accessory] }
+            accessoryType: { $ref: '#/components/schemas/AccessoryType' }
+            compatibleWith:
+              type: array
+              items: { $ref: '#/components/schemas/ObjectId' }
+
+    ProductUpdate:
+      type: object
+      minProperties: 1
+      description: '`type` змінювати не можна. `specs` тільки для телефонів, `accessoryType` і `compatibleWith` тільки для аксесуарів.'
+      properties:
+        name: { type: string }
+        slug: { type: string }
+        description: { type: string }
+        brand: { $ref: '#/components/schemas/ObjectId' }
+        category: { $ref: '#/components/schemas/ObjectId' }
+        images:
+          type: array
+          items: { type: string }
+        variants:
+          type: array
+          items: { $ref: '#/components/schemas/Variant' }
+        isActive: { type: boolean }
+        specs: { $ref: '#/components/schemas/PhoneSpecs' }
+        accessoryType: { $ref: '#/components/schemas/AccessoryType' }
+        compatibleWith:
+          type: array
+          items: { $ref: '#/components/schemas/ObjectId' }
+
+    Review:
+      type: object
+      properties:
+        _id: { $ref: '#/components/schemas/ObjectId' }
+        product: { $ref: '#/components/schemas/ObjectId' }
+        user:
+          type: object
+          properties:
+            _id: { $ref: '#/components/schemas/ObjectId' }
+            name: { type: string, example: Viktor }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        text: { type: string }
+        isVerifiedPurchase: { type: boolean, description: Автор купив і отримав цей товар }
+        createdAt: { type: string, format: date-time }
+
+    ReviewResponse:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/Review' }
+
+    CartItem:
+      type: object
+      properties:
+        product:
+          type: object
+          properties:
+            _id: { $ref: '#/components/schemas/ObjectId' }
+            name: { type: string }
+            slug: { type: string }
+            image: { type: string, nullable: true }
+        sku: { type: string }
+        color: { type: string }
+        storage: { type: integer }
+        price: { type: integer }
+        oldPrice: { type: integer }
+        stock: { type: integer }
+        quantity: { type: integer }
+        subtotal: { type: integer }
+        isAvailable: { type: boolean, description: 'false, якщо на складі менше, ніж у кошику' }
+
+    Cart:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CartItem' }
+        totalQuantity: { type: integer, example: 2 }
+        totalPrice: { type: integer, example: 79998 }
+
+    OrderStatus:
+      type: string
+      enum: [new, confirmed, shipped, delivered, cancelled]
+
+    OrderInput:
+      type: object
+      required: [contact, delivery, payment]
+      properties:
+        contact:
+          type: object
+          required: [name, phone, email]
+          properties:
+            name: { type: string, example: Viktor }
+            phone: { type: string, example: '+380501234567' }
+            email: { type: string, format: email, example: viktor@test.com }
+        delivery:
+          type: object
+          required: [method]
+          properties:
+            method: { type: string, enum: [nova-poshta, courier, pickup] }
+            city: { type: string, example: Львів }
+            address: { type: string, example: Відділення 5 }
+        payment:
+          type: object
+          required: [method]
+          properties:
+            method: { type: string, enum: [card, cash-on-delivery] }
+        comment: { type: string, maxLength: 500 }
+
+    Order:
+      type: object
+      properties:
+        _id: { $ref: '#/components/schemas/ObjectId' }
+        orderNumber: { type: integer, example: 1001 }
+        user:
+          description: ObjectId або, в `GET /orders/all`, об'єкт з name і email
+          oneOf:
+            - $ref: '#/components/schemas/ObjectId'
+            - type: object
+              properties:
+                _id: { $ref: '#/components/schemas/ObjectId' }
+                name: { type: string }
+                email: { type: string }
+        items:
+          type: array
+          description: Знімок товарів на момент покупки
+          items:
+            type: object
+            properties:
+              product: { $ref: '#/components/schemas/ObjectId' }
+              sku: { type: string }
+              name: { type: string }
+              image: { type: string }
+              price: { type: integer }
+              quantity: { type: integer }
+        contact:
+          type: object
+          properties:
+            name: { type: string }
+            phone: { type: string }
+            email: { type: string }
+        delivery:
+          type: object
+          properties:
+            method: { type: string, enum: [nova-poshta, courier, pickup] }
+            city: { type: string }
+            address: { type: string }
+            cost: { type: integer, example: 80 }
+        payment:
+          type: object
+          properties:
+            method: { type: string, enum: [card, cash-on-delivery] }
+            status: { type: string, enum: [pending, paid, refunded] }
+        totalPrice: { type: integer, example: 80078 }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        comment: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    OrderResponse:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/Order' }
+
+    Address:
+      type: object
+      properties:
+        _id: { $ref: '#/components/schemas/ObjectId' }
+        city: { type: string, example: Львів }
+        novaPoshtaBranch: { type: string, example: Відділення 5 }
+        street: { type: string, example: вул. Шевченка 10 }
+        isDefault: { type: boolean }
+
+    AddressInput:
+      type: object
+      description: Потрібне місто, а також відділення Нової пошти або вулиця
+      properties:
+        city: { type: string, maxLength: 100, example: Львів }
+        novaPoshtaBranch: { type: string, maxLength: 100, example: Відділення 5 }
+        street: { type: string, maxLength: 200 }
+        isDefault: { type: boolean }
+
+    User:
+      type: object
+      properties:
+        _id: { $ref: '#/components/schemas/ObjectId' }
+        name: { type: string, example: Viktor }
+        email: { type: string, example: viktor@test.com }
+        phone: { type: string }
+        role: { type: string, enum: [user, admin] }
+        addresses:
+          type: array
+          items: { $ref: '#/components/schemas/Address' }
+        favorites:
+          type: array
+          items: { $ref: '#/components/schemas/ObjectId' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    UserResponse:
+      allOf:
+        - $ref: '#/components/schemas/Envelope'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/User' }

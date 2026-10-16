@@ -14,6 +14,7 @@ import { UPLOAD_DIR } from './constants/index.js';
 import reviewsRouter from './routers/reviews.js';
 import favoritesRouter from './routers/favorites.js';
 import usersRouter from './routers/users.js';
+import { swaggerDocs } from './middlewares/swaggerDocs.js';
 
 const PORT = Number(getEnvVar('PORT', 5000));
 const FRONTEND_URL = getEnvVar('FRONTEND_URL', 'http://localhost:3000');
@@ -40,6 +41,7 @@ export const startServer = () => {
   });
 
   app.use('/uploads', express.static(UPLOAD_DIR));
+  app.use('/api-docs', swaggerDocs());
   app.use('/auth', authRouter);
   app.use('/', catalogRouter);
   app.use('/', reviewsRouter);
