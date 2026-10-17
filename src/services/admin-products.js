@@ -30,6 +30,19 @@ const checkReferences = async ({ brand, category, compatibleWith }) => {
   }
 };
 
+// sku має бути унікальним серед усіх товарів, а не лише всередині одного
+// (окремого унікального індексу на variants.sku у моделі немає)
+const checkSkus = async (variants, exceptProductId) => {
+  if (!variants?.length) return;
+
+  const filter = { 'variants.sku': { $in: variants.map((v) => v.sku) } };
+  if (exceptProductId) filter._id = { $ne: exceptProductId };
+
+  if (await ProductsCollection.exists(filter)) {
+    throw createHttpError(409, 'Product with this slug or SKU already exists');
+  }
+};
+
 // унікальні slug і sku: MongoDB повертає помилку з кодом 11000
 const saveProduct = async (product) => {
   try {
@@ -55,6 +68,7 @@ const findProduct = async (productId) => {
 
 export const createProduct = async (payload) => {
   await checkReferences(payload);
+  await checkSkus(payload.variants);
 
   const Model = MODELS[payload.type];
   return saveProduct(new Model(payload));
@@ -76,6 +90,7 @@ export const updateProduct = async (productId, payload) => {
   }
 
   await checkReferences(payload);
+  await checkSkus(payload.variants, product._id);
 
   product.set(payload);
   return saveProduct(product);
