@@ -18,6 +18,9 @@
   "author": "Eugene Lesnyak, Viktor Yanenko",
   "license": "ISC",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "bugs": {
     "url": "https://github.com/Viktor-Yanenko/mobi-org-backend/issues"
   },

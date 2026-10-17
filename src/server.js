@@ -17,22 +17,22 @@ import usersRouter from './routers/users.js';
 import { swaggerDocs } from './middlewares/swaggerDocs.js';
 
 const PORT = Number(getEnvVar('PORT', 5000));
-const FRONTEND_URL = getEnvVar('FRONTEND_URL', 'http://localhost:3000');
+const isProduction = process.env.NODE_ENV === 'production';
+const FRONTEND_URLS = getEnvVar('FRONTEND_URL', 'http://localhost:3000')
+  .split(',')
+  .map((url) => url.trim());
 
 export const startServer = () => {
   const app = express();
 
+  app.set('trust proxy', 1);
+
   app.use(express.json());
-  app.use(cors({ origin: FRONTEND_URL, credentials: true }));
+  app.use(cors({ origin: FRONTEND_URLS, credentials: true }));
   app.use(cookieParser());
 
-  app.use(
-    pino({
-      transport: {
-        target: 'pino-pretty',
-      },
-    }),
-  );
+  // pino-pretty стоїть у devDependencies, на сервері пишемо звичайний JSON
+  app.use(pino(isProduction ? {} : { transport: { target: 'pino-pretty' } }));
 
   app.get('/', (req, res) => {
     res.json({
