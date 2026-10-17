@@ -1,5 +1,3 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import createHttpError from 'http-errors';
 import {
   ProductsCollection,
@@ -8,7 +6,7 @@ import {
 } from '../db/models/product.js';
 import { BrandsCollection } from '../db/models/brand.js';
 import { CategoriesCollection } from '../db/models/category.js';
-import { UPLOAD_DIR } from '../constants/index.js';
+import { saveImage, deleteImage } from '../utils/imageStorage.js';
 
 const MODELS = { phone: PhonesCollection, accessory: AccessoriesCollection };
 
@@ -91,16 +89,9 @@ export const deleteProduct = async (productId) => {
 };
 
 export const addProductImages = async (productId, files, baseUrl) => {
-  const product = await ProductsCollection.findById(productId);
+  const product = await findProduct(productId);
 
-  if (!product) {
-    await Promise.all(files.map((file) => fs.unlink(file.path)));
-    throw createHttpError(404, 'Product not found');
-  }
-
-  const urls = files.map(
-    (file) => `${baseUrl}/uploads/products/${file.filename}`,
-  );
+  const urls = await Promise.all(files.map((file) => saveImage(file, baseUrl)));
   product.images.push(...urls);
   return saveProduct(product);
 };
@@ -115,9 +106,8 @@ export const removeProductImage = async (productId, url) => {
   product.images = product.images.filter((image) => image !== url);
   await saveProduct(product);
 
-  // файл видаляємо тільки якщо він лежить у нашій папці uploads
-  const fileName = path.basename(new URL(url).pathname);
-  await fs.unlink(path.join(UPLOAD_DIR, 'products', fileName)).catch(() => {});
+  // якщо файл уже видалений вручну, це не помилка: з товару посилання прибрали
+  await deleteImage(url).catch(() => {});
 
   return product;
 };
