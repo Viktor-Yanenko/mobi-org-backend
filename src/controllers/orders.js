@@ -7,6 +7,7 @@ import {
   cancelOrder,
   getAllOrders,
   updateOrderStatus,
+  getOrderStats,
 } from '../services/orders.js';
 import { ORDER_STATUSES } from '../constants/index.js';
 
@@ -78,5 +79,18 @@ export const updateOrderStatusController = async (req, res) => {
     status: 200,
     message: 'Order status updated!',
     data: await updateOrderStatus(req.params.orderId, req.body.status),
+  });
+};
+
+// за скільки днів статистика: 7, 30 або 90 (інакше 30)
+const STATS_PERIODS = [7, 30, 90];
+
+export const getOrderStatsController = async (req, res) => {
+  const days = Number(req.query.days);
+
+  res.json({
+    status: 200,
+    message: 'Successfully found stats!',
+    data: await getOrderStats(STATS_PERIODS.includes(days) ? days : 30),
   });
 };

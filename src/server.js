@@ -15,6 +15,7 @@ import reviewsRouter from './routers/reviews.js';
 import favoritesRouter from './routers/favorites.js';
 import usersRouter from './routers/users.js';
 import { swaggerDocs } from './middlewares/swaggerDocs.js';
+import helmet from 'helmet';
 
 const PORT = Number(getEnvVar('PORT', 5000));
 const isProduction = process.env.NODE_ENV === 'production';
@@ -27,6 +28,7 @@ export const startServer = () => {
 
   app.set('trust proxy', 1);
 
+  app.use(helmet());
   app.use(express.json());
   app.use(cors({ origin: FRONTEND_URLS, credentials: true }));
   app.use(cookieParser());

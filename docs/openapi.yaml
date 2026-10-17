@@ -78,6 +78,11 @@ paths:
         '200': { $ref: '#/components/responses/AccessToken' }
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '429':
+          description: 5 невдалих спроб входу в цей акаунт за 15 хвилин
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /auth/refresh:
     post:
@@ -606,6 +611,69 @@ paths:
                               data:
                                 type: array
                                 items: { $ref: '#/components/schemas/Order' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /orders/stats:
+    get:
+      tags: [Orders]
+      summary: Статистика продажів (адмін)
+      description: |
+        Скасовані замовлення не входять у кількість, виручку, графік і топ товарів, але є в `byStatus`.
+        Дні рахуються за київським часом. `lowStock` — варіанти, яких на складі 3 або менше (не залежить від періоду).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: days, in: query, schema: { type: integer, enum: [7, 30, 90], default: 30 } }
+      responses:
+        '200':
+          description: Статистика
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          days: { type: integer, example: 30 }
+                          orders: { type: integer, example: 42 }
+                          revenue: { type: number, example: 1250000 }
+                          averageCheck: { type: number, example: 29762 }
+                          byStatus:
+                            type: object
+                            additionalProperties: { type: integer }
+                            example: { new: 3, confirmed: 5, shipped: 2, delivered: 32, cancelled: 4 }
+                          daily:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                date: { type: string, example: '2026-10-17' }
+                                orders: { type: integer, example: 2 }
+                                revenue: { type: number, example: 64998 }
+                          topProducts:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                _id: { type: string }
+                                name: { type: string, example: iPhone 16 }
+                                image: { type: string, nullable: true }
+                                quantity: { type: integer, example: 10 }
+                                revenue: { type: number, example: 399990 }
+                          lowStock:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                _id: { type: string }
+                                name: { type: string, example: iPhone 16 }
+                                slug: { type: string, example: iphone-16 }
+                                sku: { type: string, example: IP16-128-PNK }
+                                stock: { type: integer, example: 0 }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 

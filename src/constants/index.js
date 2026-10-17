@@ -14,3 +14,7 @@ export const DELIVERY_COST = { 'nova-poshta': 80, courier: 150, pickup: 0 };
 export const FREE_DELIVERY_FROM = 5000;
 
 export const UPLOAD_DIR = path.resolve('uploads');
+
+// статистика для адмінки
+export const STATS_TIMEZONE = 'Europe/Kyiv';
+export const LOW_STOCK = 3; // «закінчується», якщо на складі стільки або менше
