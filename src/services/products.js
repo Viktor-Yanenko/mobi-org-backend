@@ -59,6 +59,15 @@ const buildMongoFilter = async (filter) => {
     );
   }
 
+  // аксесуари, сумісні хоча б з одним із вибраних телефонів (за slug)
+  if (filter.compatible) {
+    const phones = await ProductsCollection.find({
+      slug: { $in: filter.compatible },
+    }).select('_id');
+    if (phones.length === 0) return null;
+    mongoFilter.compatibleWith = { $in: phones.map((phone) => phone._id) };
+  }
+
   return mongoFilter;
 };
 
@@ -114,9 +123,12 @@ export const getProductFacets = async (filter) => {
     ram: undefined,
     storage: undefined,
     attributes: undefined,
+    compatible: undefined,
   });
 
-  if (!mongoFilter) return { ram: [], storage: [], attributes: [] };
+  if (!mongoFilter) {
+    return { ram: [], storage: [], attributes: [], compatible: [] };
+  }
 
   const [result] = await ProductsCollection.aggregate([
     { $match: mongoFilter },
@@ -141,6 +153,22 @@ export const getProductFacets = async (filter) => {
             },
           },
         ],
+        compatible: [
+          { $unwind: '$compatibleWith' },
+          { $group: { _id: '$compatibleWith' } },
+          {
+            // з id телефону беремо його назву і slug з тієї ж колекції
+            $lookup: {
+              from: 'products',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'phone',
+            },
+          },
+          { $unwind: '$phone' },
+          { $match: { 'phone.isActive': true } },
+          { $project: { _id: 0, slug: '$phone.slug', name: '$phone.name' } },
+        ],
       },
     },
   ]);
@@ -151,6 +179,7 @@ export const getProductFacets = async (filter) => {
     attributes: result.attributes
       .map((item) => ({ name: item._id, values: item.values.sort(byText) }))
       .sort((a, b) => byText(a.name, b.name)),
+    compatible: result.compatible.sort((a, b) => byText(a.name, b.name)),
   };
 };
 

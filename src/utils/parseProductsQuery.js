@@ -23,6 +23,12 @@ const parseAttributes = (value) => {
   return Object.keys(attributes).length ? attributes : undefined;
 };
 
+// ?compatible=iphone-16&compatible=galaxy-s25 -> ['iphone-16', 'galaxy-s25']
+const parseTextList = (value) => {
+  const items = [value].flat().filter((item) => typeof item === 'string');
+  return items.length ? items : undefined;
+};
+
 const SORT_FIELDS = {
   price: 'minPrice',
   createdAt: 'createdAt',
@@ -47,6 +53,7 @@ export const parseProductsQuery = (query) => {
     ram: query.ram && parseNumberList(query.ram),
     storage: query.storage && parseNumberList(query.storage),
     attributes: query.attr && parseAttributes(query.attr),
+    compatible: query.compatible && parseTextList(query.compatible),
   };
 
   const sortBy = SORT_FIELDS[query.sortBy] ?? 'createdAt';

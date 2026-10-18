@@ -146,6 +146,11 @@ paths:
           description: 'Характеристика аксесуара як `назва:значення`. Значення однієї характеристики через «або», різні характеристики через «і»'
           schema: { type: array, items: { type: string } }
           example: ['Довжина:1 м', 'Довжина:2 м']
+        - name: compatible
+          in: query
+          description: Slug телефону. Аксесуари, сумісні хоча б з одним із вибраних
+          schema: { type: array, items: { type: string } }
+          example: [iphone-16]
         - { name: search, in: query, description: Частина назви, schema: { type: string } }
         - { name: sortBy, in: query, schema: { type: string, enum: [price, createdAt, rating, name], default: createdAt } }
         - { name: sortOrder, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
@@ -233,6 +238,14 @@ paths:
                               properties:
                                 name: { type: string, example: Довжина }
                                 values: { type: array, items: { type: string }, example: ['1 м', '2 м'] }
+                          compatible:
+                            type: array
+                            description: Телефони, з якими сумісні знайдені аксесуари
+                            items:
+                              type: object
+                              properties:
+                                slug: { type: string, example: iphone-16 }
+                                name: { type: string, example: iPhone 16 }
 
   /products/{slugOrId}:
     get:
