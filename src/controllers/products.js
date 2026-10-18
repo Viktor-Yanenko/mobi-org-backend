@@ -1,5 +1,9 @@
 import createHttpError from 'http-errors';
-import { getAllProducts, getProductBySlug } from '../services/products.js';
+import {
+  getAllProducts,
+  getProductBySlug,
+  getProductFacets,
+} from '../services/products.js';
 import { parseProductsQuery } from '../utils/parseProductsQuery.js';
 
 export const getProductsController = async (req, res) => {
@@ -23,5 +27,16 @@ export const getProductBySlugController = async (req, res) => {
     status: 200,
     message: 'Successfully found product!',
     data: product,
+  });
+};
+
+export const getProductFacetsController = async (req, res) => {
+  const { filter } = parseProductsQuery(req.query);
+  const facets = await getProductFacets(filter);
+
+  res.json({
+    status: 200,
+    message: 'Successfully found filters!',
+    data: facets,
   });
 };

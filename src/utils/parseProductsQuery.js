@@ -3,6 +3,26 @@ const parseNumber = (value, defaultValue) => {
   return Number.isFinite(number) && number >= 0 ? number : defaultValue;
 };
 
+// ?ram=8&ram=12 приходить масивом, ?ram=8,12 рядком: обидва варіанти дають [8, 12]
+const parseNumberList = (value) => {
+  const items = [value].flat().join(',').split(',');
+  const numbers = items.map(Number).filter((n) => n > 0);
+  return numbers.length ? numbers : undefined;
+};
+
+// ?attr=Довжина:1 м&attr=Довжина:2 м -> { Довжина: ['1 м', '2 м'] }
+const parseAttributes = (value) => {
+  const attributes = {};
+  for (const item of [value].flat()) {
+    if (typeof item !== 'string') continue;
+    const index = item.indexOf(':');
+    if (index < 1) continue;
+    const name = item.slice(0, index);
+    (attributes[name] ??= []).push(item.slice(index + 1));
+  }
+  return Object.keys(attributes).length ? attributes : undefined;
+};
+
 const SORT_FIELDS = {
   price: 'minPrice',
   createdAt: 'createdAt',
@@ -24,6 +44,9 @@ export const parseProductsQuery = (query) => {
     minPrice: parseNumber(query.minPrice, undefined),
     maxPrice: parseNumber(query.maxPrice, undefined),
     search: typeof query.search === 'string' ? query.search.trim() : undefined,
+    ram: query.ram && parseNumberList(query.ram),
+    storage: query.storage && parseNumberList(query.storage),
+    attributes: query.attr && parseAttributes(query.attr),
   };
 
   const sortBy = SORT_FIELDS[query.sortBy] ?? 'createdAt';

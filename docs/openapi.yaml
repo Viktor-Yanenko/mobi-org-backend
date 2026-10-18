@@ -131,6 +131,21 @@ paths:
         - { name: category, in: query, description: Slug категорії, schema: { type: string, example: smartphones } }
         - { name: minPrice, in: query, description: 'Мінімальна ціна, грн', schema: { type: number } }
         - { name: maxPrice, in: query, description: 'Максимальна ціна, грн', schema: { type: number } }
+        - name: ram
+          in: query
+          description: Оперативна пам'ять, ГБ. Кілька значень через «або»
+          schema: { type: array, items: { type: integer } }
+          example: [8, 12]
+        - name: storage
+          in: query
+          description: Вбудована пам'ять, ГБ. Разом із `ram` шукає один варіант, наприклад 8/256
+          schema: { type: array, items: { type: integer } }
+          example: [256]
+        - name: attr
+          in: query
+          description: 'Характеристика аксесуара як `назва:значення`. Значення однієї характеристики через «або», різні характеристики через «і»'
+          schema: { type: array, items: { type: string } }
+          example: ['Довжина:1 м', 'Довжина:2 м']
         - { name: search, in: query, description: Частина назви, schema: { type: string } }
         - { name: sortBy, in: query, schema: { type: string, enum: [price, createdAt, rating, name], default: createdAt } }
         - { name: sortOrder, in: query, schema: { type: string, enum: [asc, desc], default: desc } }
@@ -183,6 +198,41 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
+
+  /products/facets:
+    get:
+      tags: [Catalog]
+      summary: Значення для фільтрів каталогу
+      description: Яка пам'ять і які характеристики аксесуарів є серед товарів, що підходять під `type`, `brand`, `category`, ціну й пошук. Параметри `ram`, `storage` і `attr` тут ігноруються.
+      parameters:
+        - { name: type, in: query, schema: { type: string, enum: [phone, accessory] } }
+        - { name: brand, in: query, schema: { type: string } }
+        - { name: category, in: query, schema: { type: string, example: cables } }
+        - { name: minPrice, in: query, schema: { type: number } }
+        - { name: maxPrice, in: query, schema: { type: number } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Значення фільтрів
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ram: { type: array, items: { type: integer }, example: [6, 8, 12] }
+                          storage: { type: array, items: { type: integer }, example: [128, 256] }
+                          attributes:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string, example: Довжина }
+                                values: { type: array, items: { type: string }, example: ['1 м', '2 м'] }
 
   /products/{slugOrId}:
     get:
@@ -1267,7 +1317,8 @@ components:
       properties:
         sku: { type: string, example: IP16-128-BLK }
         color: { type: string, example: Black }
-        storage: { type: integer, description: ГБ, example: 128 }
+        storage: { type: integer, description: "Вбудована пам'ять, ГБ", example: 128 }
+        ram: { type: integer, description: "Оперативна пам'ять, ГБ", example: 8 }
         price: { type: integer, description: грн, example: 39999 }
         oldPrice: { type: integer, description: Стара ціна для знижки, example: 42999 }
         stock: { type: integer, example: 10 }
@@ -1281,7 +1332,6 @@ components:
       properties:
         os: { type: string, example: iOS 18 }
         processor: { type: string, example: Apple A18 }
-        ram: { type: integer, example: 8, description: ГБ }
         screenSize: { type: number, example: 6.1, description: дюйми }
         screenType: { type: string, example: OLED }
         refreshRate: { type: integer, example: 60, description: Гц }
@@ -1462,6 +1512,7 @@ components:
         sku: { type: string }
         color: { type: string }
         storage: { type: integer }
+        ram: { type: integer }
         price: { type: integer }
         oldPrice: { type: integer }
         stock: { type: integer }

@@ -17,7 +17,8 @@ const productsSchema = new Schema(
         // колір / пам'ять
         sku: { type: String, required: true },
         color: String,
-        storage: Number, // ГБ, для аксесуарів не задається
+        storage: Number,
+        ram: Number,
         price: { type: Number, required: true, min: 0 }, // грн
         oldPrice: { type: Number, min: 0 }, // для знижки
         stock: { type: Number, default: 0, min: 0 },
@@ -48,7 +49,6 @@ export const PhonesCollection = ProductsCollection.discriminator(
     specs: {
       os: String,
       processor: String,
-      ram: Number, // ГБ
       screenSize: Number, // дюйми
       screenType: String, // OLED, AMOLED, IPS…
       refreshRate: Number, // Гц

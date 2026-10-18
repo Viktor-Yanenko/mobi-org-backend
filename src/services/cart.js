@@ -44,6 +44,7 @@ const formatCart = async (cart) => {
         sku: item.sku,
         color: variant.color,
         storage: variant.storage,
+        ram: variant.ram,
         price: variant.price,
         oldPrice: variant.oldPrice,
         stock: variant.stock,

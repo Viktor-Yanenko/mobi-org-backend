@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getProductsController,
   getProductBySlugController,
+  getProductFacetsController,
 } from '../controllers/products.js';
 import {
   createProductController,
@@ -23,6 +24,7 @@ const router = Router();
 
 // публічні маршрути
 router.get('/', getProductsController);
+router.get('/facets', getProductFacetsController);
 router.get('/:slug', getProductBySlugController);
 
 // тільки для адміна

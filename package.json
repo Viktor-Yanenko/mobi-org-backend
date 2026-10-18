@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "seed": "node src/db/seed.js",
+    "migrate:ram": "node src/db/migrate-ram.js",
     "lint": "eslint src/**/*.js",
     "start": "node ./src/index.js",
     "dev": "nodemon src/index.js",

@@ -7,6 +7,7 @@ const variantSchema = Joi.object({
   sku: Joi.string().trim().uppercase().required(),
   color: Joi.string().trim(),
   storage: Joi.number().integer().min(1),
+  ram: Joi.number().integer().min(1),
   price: Joi.number().integer().min(0).required(),
   oldPrice: Joi.number().integer().min(0),
   stock: Joi.number().integer().min(0).default(0),
@@ -35,7 +36,6 @@ const phoneFields = {
   specs: Joi.object({
     os: Joi.string().trim(),
     processor: Joi.string().trim().max(60),
-    ram: Joi.number().integer().min(1),
     screenSize: Joi.number().min(1).max(20),
     screenType: Joi.string().trim().max(40),
     refreshRate: Joi.number().integer().min(30).max(240),
