@@ -1,4 +1,5 @@
 import { model, Schema } from 'mongoose';
+import { ACCESSORY_TYPES } from '../../constants/index.js';
 
 const { ObjectId } = Schema.Types;
 
@@ -46,9 +47,18 @@ export const PhonesCollection = ProductsCollection.discriminator(
   new Schema({
     specs: {
       os: String,
-      screenSize: Number,
-      ram: Number,
-      battery: Number,
+      processor: String,
+      ram: Number, // ГБ
+      screenSize: Number, // дюйми
+      screenType: String, // OLED, AMOLED, IPS…
+      refreshRate: Number, // Гц
+      mainCamera: Number, // Мп
+      frontCamera: Number, // Мп
+      battery: Number, // мА·год
+      has5g: Boolean,
+      hasNfc: Boolean,
+      weight: Number, // г
+      waterResistance: String, // IP68
     },
   }),
 );
@@ -56,19 +66,15 @@ export const PhonesCollection = ProductsCollection.discriminator(
 export const AccessoriesCollection = ProductsCollection.discriminator(
   'accessory',
   new Schema({
-    accessoryType: {
-      type: String,
-      enum: [
-        'case',
-        'charger',
-        'cable',
-        'headphones',
-        'screen-protector',
-        'powerbank',
-        'other',
-      ],
-      required: true,
-    },
+    accessoryType: { type: String, enum: ACCESSORY_TYPES, required: true },
+    // довільні характеристики: у кабелю довжина, у павербанка ємність тощо
+    attributes: [
+      {
+        _id: false,
+        name: { type: String, required: true }, // «Довжина»
+        value: { type: String, required: true }, // «1 м»
+      },
+    ],
     compatibleWith: [{ type: Schema.Types.ObjectId, ref: 'products' }],
   }),
 );

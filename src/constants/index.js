@@ -18,3 +18,18 @@ export const UPLOAD_DIR = path.resolve('uploads');
 // статистика для адмінки
 export const STATS_TIMEZONE = 'Europe/Kyiv';
 export const LOW_STOCK = 3; // «закінчується», якщо на складі стільки або менше
+
+// типи аксесуарів: однаковий список для моделі й валідації
+export const ACCESSORY_TYPES = [
+  'case',
+  'charger',
+  'cable',
+  'headphones',
+  'screen-protector',
+  'powerbank',
+  'smartwatch',
+  'speaker',
+  'memory-card',
+  'holder',
+  'other',
+];

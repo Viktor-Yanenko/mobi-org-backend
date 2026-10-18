@@ -316,6 +316,106 @@ paths:
                       data:
                         type: array
                         items: { $ref: '#/components/schemas/Brand' }
+    post:
+      tags: [Catalog]
+      summary: Додати бренд (адмін)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 60, example: Motorola }
+                slug: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', example: motorola }
+      responses:
+        '201':
+          description: Створено
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Brand' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /brands/all:
+    get:
+      tags: [Catalog]
+      summary: Бренди з кількістю товарів (адмін)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Кожен елемент має `productsCount` (разом із прихованими товарами)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: '#/components/schemas/Brand'
+                            - type: object
+                              properties:
+                                productsCount: { type: integer, example: 3 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /brands/{brandId}:
+    parameters:
+      - { name: brandId, in: path, required: true, schema: { $ref: '#/components/schemas/ObjectId' } }
+    patch:
+      tags: [Catalog]
+      summary: Змінити бренд (адмін)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 2, maxLength: 60 }
+                slug: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+      responses:
+        '200':
+          description: Оновлено
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Brand' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Catalog]
+      summary: Видалити бренд (адмін)
+      description: Лише якщо в нього немає жодного товару, інакше 409.
+      security:
+        - bearerAuth: []
+      responses:
+        '204': { description: Видалено }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /categories:
     get:
@@ -334,6 +434,107 @@ paths:
                       data:
                         type: array
                         items: { $ref: '#/components/schemas/Category' }
+    post:
+      tags: [Catalog]
+      summary: Додати категорію (адмін)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug, type]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 60, example: Смарт-годинники }
+                slug: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$', example: smartwatches }
+                type: { type: string, enum: [phone, accessory] }
+      responses:
+        '201':
+          description: Створено
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /categories/all:
+    get:
+      tags: [Catalog]
+      summary: Категорії з кількістю товарів (адмін)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Кожен елемент має `productsCount` (разом із прихованими товарами)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: '#/components/schemas/Category'
+                            - type: object
+                              properties:
+                                productsCount: { type: integer, example: 3 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /categories/{categoryId}:
+    parameters:
+      - { name: categoryId, in: path, required: true, schema: { $ref: '#/components/schemas/ObjectId' } }
+    patch:
+      tags: [Catalog]
+      summary: Змінити категорію (адмін)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 2, maxLength: 60 }
+                slug: { type: string, pattern: '^[a-z0-9]+(-[a-z0-9]+)*$' }
+      responses:
+        '200':
+          description: Оновлено
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Catalog]
+      summary: Видалити категорію (адмін)
+      description: Лише якщо в нього немає жодного товару, інакше 409.
+      security:
+        - bearerAuth: []
+      responses:
+        '204': { description: Видалено }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   # ───────────── Reviews ─────────────
   /products/{productId}/reviews:
@@ -1076,15 +1277,36 @@ components:
 
     PhoneSpecs:
       type: object
+      description: Усі поля необов'язкові
       properties:
         os: { type: string, example: iOS 18 }
-        screenSize: { type: number, example: 6.1 }
-        ram: { type: integer, example: 8 }
-        battery: { type: integer, example: 3561 }
+        processor: { type: string, example: Apple A18 }
+        ram: { type: integer, example: 8, description: ГБ }
+        screenSize: { type: number, example: 6.1, description: дюйми }
+        screenType: { type: string, example: OLED }
+        refreshRate: { type: integer, example: 60, description: Гц }
+        mainCamera: { type: number, example: 48, description: Мп }
+        frontCamera: { type: number, example: 12, description: Мп }
+        battery: { type: integer, example: 3561, description: мА·год }
+        has5g: { type: boolean, example: true }
+        hasNfc: { type: boolean, example: true }
+        weight: { type: integer, example: 170, description: г }
+        waterResistance: { type: string, example: IP68, pattern: '^IP\d{2}$' }
 
     AccessoryType:
       type: string
-      enum: [case, charger, cable, headphones, screen-protector, powerbank, other]
+      enum: [case, charger, cable, headphones, screen-protector, powerbank, smartwatch, speaker, memory-card, holder, other]
+
+    AccessoryAttributes:
+      type: array
+      maxItems: 20
+      description: Довільні характеристики аксесуара (лише для `type = accessory`)
+      items:
+        type: object
+        required: [name, value]
+        properties:
+          name: { type: string, maxLength: 40, example: Потужність }
+          value: { type: string, maxLength: 100, example: 30 Вт }
 
     Product:
       type: object
@@ -1115,6 +1337,7 @@ components:
         compatibleWith:
           type: array
           items: { $ref: '#/components/schemas/ObjectId' }
+        attributes: { $ref: '#/components/schemas/AccessoryAttributes' }
         accessories:
           type: array
           description: 'Тільки в `GET /products/{slug}` для телефону'
@@ -1178,6 +1401,7 @@ components:
             compatibleWith:
               type: array
               items: { $ref: '#/components/schemas/ObjectId' }
+            attributes: { $ref: '#/components/schemas/AccessoryAttributes' }
 
     ProductUpdate:
       type: object
@@ -1201,6 +1425,7 @@ components:
         compatibleWith:
           type: array
           items: { $ref: '#/components/schemas/ObjectId' }
+        attributes: { $ref: '#/components/schemas/AccessoryAttributes' }
 
     Review:
       type: object

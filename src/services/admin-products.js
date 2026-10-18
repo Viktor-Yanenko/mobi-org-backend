@@ -81,7 +81,7 @@ export const updateProduct = async (productId, payload) => {
 
   if (
     product.type === 'phone' &&
-    (payload.accessoryType || payload.compatibleWith)
+    (payload.accessoryType || payload.compatibleWith || payload.attributes)
   ) {
     throw createHttpError(400, 'Phone cannot have accessory fields');
   }

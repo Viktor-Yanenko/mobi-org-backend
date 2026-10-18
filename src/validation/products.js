@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { ACCESSORY_TYPES } from '../constants/index.js';
 
 const objectId = Joi.string().hex().length(24);
 
@@ -33,23 +34,36 @@ const baseFields = {
 const phoneFields = {
   specs: Joi.object({
     os: Joi.string().trim(),
-    screenSize: Joi.number().min(1).max(20),
+    processor: Joi.string().trim().max(60),
     ram: Joi.number().integer().min(1),
+    screenSize: Joi.number().min(1).max(20),
+    screenType: Joi.string().trim().max(40),
+    refreshRate: Joi.number().integer().min(30).max(240),
+    mainCamera: Joi.number().min(1).max(300),
+    frontCamera: Joi.number().min(1).max(100),
     battery: Joi.number().integer().min(100),
+    has5g: Joi.boolean(),
+    hasNfc: Joi.boolean(),
+    weight: Joi.number().integer().min(50).max(1000),
+    waterResistance: Joi.string()
+      .trim()
+      .uppercase()
+      .pattern(/^IP\d{2}$/)
+      .messages({ 'string.pattern.base': 'waterResistance: format like IP68' }),
   }),
 };
 
 const accessoryFields = {
-  accessoryType: Joi.string().valid(
-    'case',
-    'charger',
-    'cable',
-    'headphones',
-    'screen-protector',
-    'powerbank',
-    'other',
-  ),
+  accessoryType: Joi.string().valid(...ACCESSORY_TYPES),
   compatibleWith: Joi.array().items(objectId),
+  attributes: Joi.array()
+    .items(
+      Joi.object({
+        name: Joi.string().trim().max(40).required(),
+        value: Joi.string().trim().max(100).required(),
+      }),
+    )
+    .max(20),
 };
 
 const requireKeys = (fields, keys) =>
