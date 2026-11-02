@@ -229,6 +229,15 @@ paths:
                       data:
                         type: object
                         properties:
+                          brands:
+                            type: array
+                            description: Бренди, у яких є товари з такими type, category, ціною й пошуком (вибраний brand не враховується)
+                            items:
+                              type: object
+                              properties:
+                                _id: { type: string }
+                                name: { type: string, example: Apple }
+                                slug: { type: string, example: apple }
                           ram: { type: array, items: { type: integer }, example: [6, 8, 12] }
                           storage: { type: array, items: { type: integer }, example: [128, 256] }
                           attributes:

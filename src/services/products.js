@@ -113,22 +113,37 @@ const byNumber = (a, b) => a - b;
 // «2 м» після «1 м», а «10 м» після «2 м»
 const byText = (a, b) => a.localeCompare(b, 'uk', { numeric: true });
 
+// бренди, у яких є товари з вибраним типом, категорією, ціною і пошуком.
+// Сам вибраний бренд не враховуємо, інакше в списку лишився б тільки він
+const getBrandsFor = async (filter) => {
+  const mongoFilter = await buildMongoFilter({ ...filter, brand: undefined });
+  if (!mongoFilter) return [];
+
+  const ids = await ProductsCollection.distinct('brand', mongoFilter);
+  return BrandsCollection.find({ _id: { $in: ids } })
+    .sort({ name: 1 })
+    .select('name slug');
+};
+
 // варіанти для фільтрів: яка пам'ять і які характеристики взагалі є
 // серед товарів з вибраним типом, категорією, брендом, ціною і пошуком
 export const getProductFacets = async (filter) => {
   // фільтри за пам'яттю й характеристиками тут не застосовуємо: інакше після
   // вибору «1 м» зник би варіант «2 м» і вибрати обидва стало б неможливо
-  const mongoFilter = await buildMongoFilter({
+  const facetFilter = {
     ...filter,
     ram: undefined,
     storage: undefined,
     attributes: undefined,
     compatible: undefined,
-  });
+  };
+  const mongoFilter = await buildMongoFilter(facetFilter);
 
   if (!mongoFilter) {
-    return { ram: [], storage: [], attributes: [], compatible: [] };
+    return { brands: [], ram: [], storage: [], attributes: [], compatible: [] };
   }
+
+  const brands = await getBrandsFor(facetFilter);
 
   const [result] = await ProductsCollection.aggregate([
     { $match: mongoFilter },
@@ -174,6 +189,7 @@ export const getProductFacets = async (filter) => {
   ]);
 
   return {
+    brands,
     ram: result.ram.map((item) => item._id).sort(byNumber),
     storage: result.storage.map((item) => item._id).sort(byNumber),
     attributes: result.attributes
