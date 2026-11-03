@@ -199,12 +199,54 @@ export const getProductFacets = async (filter) => {
   };
 };
 
+const SIMILAR_LIMIT = 8;
+
+// схожі товари з тієї ж категорії. Спершу аксесуари до тих самих телефонів,
+// потім той самий бренд, далі ті, що найближчі за ціною
+const getSimilarProducts = async (product) => {
+  const similar = await ProductsCollection.aggregate([
+    {
+      $match: {
+        category: product.category._id,
+        _id: { $ne: product._id },
+        isActive: true,
+      },
+    },
+    {
+      $addFields: {
+        // скільки спільних сумісних телефонів (у телефонів завжди 0)
+        sharedPhones: {
+          $size: {
+            $setIntersection: [
+              { $ifNull: ['$compatibleWith', []] },
+              product.compatibleWith ?? [],
+            ],
+          },
+        },
+        sameBrand: { $eq: ['$brand', product.brand._id] },
+        priceDiff: { $abs: { $subtract: ['$minPrice', product.minPrice] } },
+      },
+    },
+    { $sort: { sharedPhones: -1, sameBrand: -1, priceDiff: 1 } },
+    { $limit: SIMILAR_LIMIT },
+    { $project: { sharedPhones: 0, sameBrand: 0, priceDiff: 0 } },
+  ]);
+
+  // aggregate повертає звичайні об'єкти, бренд підставляємо окремо
+  return ProductsCollection.populate(similar, {
+    path: 'brand',
+    select: 'name slug',
+  });
+};
+
 export const getProductBySlug = async (slug) => {
   const product = await ProductsCollection.findOne({ slug, isActive: true })
     .populate('brand', 'name slug logo')
     .populate('category', 'name slug');
 
   if (!product) return null;
+
+  const similar = await getSimilarProducts(product);
 
   // для телефону одразу віддаємо сумісні аксесуари
   if (product.type === 'phone') {
@@ -213,8 +255,8 @@ export const getProductBySlug = async (slug) => {
       isActive: true,
     }).select('name slug images minPrice accessoryType');
 
-    return { ...product.toObject(), accessories };
+    return { ...product.toObject(), similar, accessories };
   }
 
-  return product;
+  return { ...product.toObject(), similar };
 };

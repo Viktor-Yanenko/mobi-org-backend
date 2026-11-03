@@ -1414,6 +1414,13 @@ components:
           type: array
           description: 'Тільки в `GET /products/{slug}` для телефону'
           items: { $ref: '#/components/schemas/ProductShort' }
+        similar:
+          type: array
+          description: >-
+            Тільки в `GET /products/{slug}`: до 8 товарів тієї ж категорії
+            (спершу аксесуари до тих самих телефонів, потім той самий бренд,
+            далі найближчі за ціною). Бренд підставлено як { _id, name, slug }
+          items: { type: object }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -1553,7 +1560,10 @@ components:
 
     OrderStatus:
       type: string
-      enum: [new, confirmed, shipped, delivered, cancelled]
+      enum: [new, confirmed, shipped, ready, delivered, cancelled]
+      description: >-
+        Нова пошта: new → confirmed → shipped → ready → delivered.
+        Кур'єр: без ready. Самовивіз: без shipped. cancelled можливий завжди
 
     OrderInput:
       type: object
@@ -1627,6 +1637,14 @@ components:
         totalPrice: { type: integer, example: 80078 }
         status: { $ref: '#/components/schemas/OrderStatus' }
         comment: { type: string }
+        statusHistory:
+          type: array
+          description: Коли замовлення переходило в кожен статус
+          items:
+            type: object
+            properties:
+              status: { $ref: '#/components/schemas/OrderStatus' }
+              date: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
 
     OrderResponse:

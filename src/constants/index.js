@@ -5,8 +5,9 @@ import path from 'node:path';
 export const ORDER_STATUSES = [
   'new',
   'confirmed',
-  'shipped',
-  'delivered',
+  'shipped', // відправлено / передано кур'єру
+  'ready', // прибуло у відділення / готове до видачі в магазині
+  'delivered', // покупець отримав
   'cancelled',
 ];
 
@@ -33,3 +34,9 @@ export const ACCESSORY_TYPES = [
   'holder',
   'other',
 ];
+
+export const STATUS_FLOW = {
+  'nova-poshta': ['new', 'confirmed', 'shipped', 'ready', 'delivered'],
+  courier: ['new', 'confirmed', 'shipped', 'delivered'],
+  pickup: ['new', 'confirmed', 'ready', 'delivered'],
+};

@@ -1,4 +1,5 @@
 import { model, Schema } from 'mongoose';
+import { ORDER_STATUSES } from '../../constants/index.js';
 
 const { ObjectId } = Schema.Types;
 
@@ -35,12 +36,25 @@ const ordersSchema = new Schema(
     totalPrice: { type: Number, required: true },
     status: {
       type: String,
-      enum: ['new', 'confirmed', 'shipped', 'delivered', 'cancelled'],
+      enum: ORDER_STATUSES,
       default: 'new',
     },
     comment: String,
+    statusHistory: [
+      {
+        _id: false,
+        status: String,
+        date: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true },
 );
+
+ordersSchema.pre('save', function () {
+  if (this.isNew || this.isModified('status')) {
+    this.statusHistory.push({ status: this.status, date: new Date() });
+  }
+});
 
 export const OrdersCollection = model('orders', ordersSchema);

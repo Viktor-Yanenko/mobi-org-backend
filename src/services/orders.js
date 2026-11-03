@@ -9,6 +9,7 @@ import {
   ORDER_STATUSES,
   STATS_TIMEZONE,
   LOW_STOCK,
+  STATUS_FLOW,
 } from '../constants/index.js';
 
 // списує залишок, тільки якщо на складі вистачає (інакше нічого не змінює)
@@ -159,6 +160,17 @@ export const updateOrderStatus = async (orderId, status) => {
     throw createHttpError(409, 'Cancelled order cannot be changed');
   }
 
+  // наприклад, «прибуло у відділення» для кур'єрської доставки не буває
+  if (
+    status !== 'cancelled' &&
+    !STATUS_FLOW[order.delivery.method]?.includes(status)
+  ) {
+    throw createHttpError(
+      400,
+      `Status "${status}" is not used for ${order.delivery.method} delivery`,
+    );
+  }
+
   order.status = status;
   await order.save();
 
@@ -187,11 +199,16 @@ const orderDay = {
 };
 
 export const getOrderStats = async (days) => {
-  // усі дні періоду, від найстарішого до сьогодні
   const now = Date.now();
-  const dates = Array.from({ length: days }, (_, i) =>
-    toDateKey(new Date(now - (days - 1 - i) * DAY)),
-  );
+  // усі дні періоду, від найстарішого до сьогодні. Рахуємо календарем
+  // (setUTCDate), а не відніманням 24 годин: 25 жовтня, коли переводять
+  // годинник, триває 25 годин, і тоді одна дата повторювалась
+  const today = toDateKey(new Date(now));
+  const dates = Array.from({ length: days }, (_, i) => {
+    const date = new Date(`${today}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - (days - 1 - i));
+    return date.toISOString().slice(0, 10);
+  });
 
   const notCancelled = { $match: { status: { $ne: 'cancelled' } } };
 
